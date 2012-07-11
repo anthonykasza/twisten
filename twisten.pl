@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 ############################################################
-### This script was originally written by Anthony Kasza  ###
-###                 on  15 April 2011                    ###
+###  		akasza	        15 April 2011            ###
 ###                                                      ###
 ### This script will listen to a user defined twitter    ###
 ### account and run system commands mapped to specified  ###

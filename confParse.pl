@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 ############################################################
-### This script was originally written by Anthony Kasza  ###
-###                  on 25 May 2012                      ###
+### 		akasza         25 May 2012               ###
 ###                                                      ###
 ### This script will parse twisten configuration files   ###
 ### and wait for user input. This script is meant to     ###
