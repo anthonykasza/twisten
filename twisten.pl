@@ -1,126 +1,78 @@
 #!/usr/bin/perl
-############################################################
-###  		akasza	        15 April 2011            ###
-###                                                      ###
-### This script will listen to a user defined twitter    ###
-### account and run system commands mapped to specified  ###
-### tweets.                                              ###
-############################################################
+#
+#  name:        twisten
+#  author:      anthony kasza
+#  description: this script will periodically pull a twitter account's 
+#               timeline and run system commands based on tweets.
+#               keywords and commands are defined in a configuration file.   
+#  version:     2.0
+#
 use warnings;
 use strict;
 use LWP::Simple;
-use XML::Simple;
+use JSON;
 use Time::Local;
-############################################################
-###          read and parse configuration file           ###
-############################################################
-open (CONF, "twisten.conf") or die $!;
-#
-# add twisten.conf santity checking here
-#
-my @fullConfFile=<CONF>;
-close (CONF);
-my %config=();
-foreach (@fullConfFile){
-        unless ($_=~/^\#/){
-                if ($_=~/(.+)\:\:\:(.+)/){
-                        %config=(%config, $1=>$2);
-                }
-        }
+use constant CONF_LOCATION => qw( ./twisten.conf );
+use constant SLEEP_TIME => qw( 15 );
+use constant SCREEN_NAME => qw( bobboblahbah123 );
+
+my $init_tweets_hash_ref = get_tweets();
+my $init_latest_tweet_time = ( sort keys %$init_tweets_hash_ref )[-1];
+
+open (CONF_HANDLE, CONF_LOCATION) or die $!;
+my %config = ();
+foreach (<CONF_HANDLE>) {
+  next if (/^\#.*/);
+  if (/(.+)\:{3}(.+)/) {
+    %config = (%config, $1 => $2,);
+  }
 }
-############################################################
-### call tweet procesor and begin main script	         ###
-############################################################
-my $initialHighest; my $newTweetFlag=0; my %tweets; my $highest;
-%tweets=&pullXML;
-$initialHighest=&findHighest(%tweets);
-while (1){ 
-	sleep (15);
-	%tweets=&pullXML;
-	$highest=&findHighest(%tweets);
-	########################################################
-	### determine if new tweet has happened, sets flag   ###
-	########################################################
-	if ($highest > $initialHighest){
-        	$newTweetFlag=1;
-	        $initialHighest=$highest;
-	    }
-	elsif ($highest < $initialHighest){
-	        die "ERROR:: HOW DID THIS HAPPEN?\n";
-	}
-	else{
-	        $newTweetFlag=0;
-	}
-	########################################################
-	### checks for new tweet flag, runs command if       ###
-	### correlating tweet is found in the config file    ###
-	########################################################
-	if ($newTweetFlag==1){
-		print "NEW TWEET FOUND...$tweets{$highest}\n";
-		$newTweetFlag=0;		
-		if (  defined $config{( $tweets{$highest} )}  ){
-			print "executing..." . $config{( $tweets{$highest} )} . "\n";
-#		       	exec( $config{$input} );
+close (CONF_HANDLE);
+
+while (1) {
+  sleep(SLEEP_TIME);
+  my $tweets_hash_ref = get_tweets();
+  my $latest_tweet_time = ( sort keys %$tweets_hash_ref )[-1];
+
+  if ($init_latest_tweet_time == $latest_tweet_time) {
+    next;
+  } elsif ( $init_latest_tweet_time < $latest_tweet_time ) {
+    print "new tweet found => ",$tweets_hash_ref->{$latest_tweet_time}, "\n";	
+      if (  defined $config{ ($tweets_hash_ref->{$latest_tweet_time}) }  ) {
+			print "executing => ", $config{ ($tweets_hash_ref->{$latest_tweet_time}) }, "\n";
+#		     exec( $config{ ($tweets_hash_ref->{$latest_tweet_time}) );
 		}
 		else{
-	        	print "received unrecognized command\n";
+	        	print "received unrecognized tweet, no command to execute\n";
 		}
-	}
+  } elsif ( $init_latest_tweet_time > $latest_tweet_time ) {
+    die "\n supposedly new tweet has less epoch than old tweet.\n  time travel?\n";
+  } else {
+    die "\n not greater than, not less than, not equal to...\n  what's left to live for?\n";
+  }
 }
 
-############################################################
-### returns highest key (epoch time) in tweets hash      ###
-############################################################
-sub findHighest{
-	my $highest=0;
-    	my $tweets= shift;
-	foreach my $keys (keys %tweets){
-        	if ($keys > $highest){
-                	$highest=$keys;
-        	}
-    	}
-    	return $highest;
+sub get_tweets {
+  my %tweets;
+  my $url = 'http://api.twitter.com/1/statuses/user_timeline.json?screen_name=' . SCREEN_NAME;
+# no JSON validation done here
+  my $json_array_ref = from_json(get $url);
+  
+  for my $tweet_hash_ref (@$json_array_ref) {
+    %tweets = ( %tweets, convert_time( $tweet_hash_ref->{'created_at'} ) => $tweet_hash_ref->{'text'} );
+  }
+  return \%tweets;
 }
 
-############################################################
-### pulls xml into hash, parses xml to get tweets        ###  
-### and timestamps, then sets key of tweets to           ###
-###               epoch timestamp                        ###
-############################################################
-sub pullXML{
-    	my %months=(
-        	Jan=>0, Feb=>1, Mar=>2, Apr=>3, May=>4, Jun=>5, 
-        	Jul=>6, Aug=>7, Sep=>8, Oct=>9, Nov=>10, Dec=>11,
-   	);
-    	my ($secs, $mins, $hours, $day, $month, $year); my %tweets;
-    
-    	#  $url = website of the public account's rss feed
-    	my $url = 'http://twitter.com/statuses/user_timeline/bobboblahbah123.rss';
-    	my $rssPage = get $url;
-    	die "Error: Couldn't find page\ncheck your internet connection" unless defined $rssPage;
-    
-    	# create anonymous hash of date=>tweet
-    	my $xml = new XML::Simple(KeyAttr=>'pubDate');
-    	my $xmlHashRef = $xml->XMLin( "$rssPage" );
-    	my $xmlHashRefPiece = ( $xmlHashRef->{channel}->{item} );
-    	foreach my $keys (keys %$xmlHashRefPiece){
-        	# convert twitter time to epoch time
-        	($keys =~ /^(\D+)(\d+) (\w+) (\d+) (\d+):(\d+):(\d+)/);
-        	$day=$2; $month=$months{$3}; $year=$4; $hours=$5; $mins=$6; $secs=$7;
-        	my $keyDate=timelocal($secs,$mins,$hours,$day,$month,$year);
-        	# place sanitized epoch=>tweet pairs into new hash
-        	($xmlHashRefPiece->{$keys}->{description}=~/^(\w+)\W (.+)/); my $tweet=$2;  
-        	if (%tweets){
-            		%tweets=( 
-				%tweets,$keyDate=> $tweet,
-           		);  
-        	}
-        	unless (%tweets){
-            		%tweets=(
-                		$keyDate=> $tweet,
-            		);
-        	}
-   	}
-    	return %tweets;
+sub convert_time {
+  my $created_at = shift;
+  my %months = ( Jan=>0, Feb=>1, Mar=>2, Apr=>3, May=>4, Jun=>5, 
+        	     Jul=>6, Aug=>7, Sep=>8, Oct=>9, Nov=>10, Dec=>11, );
+	     
+# example of a 'created_at' value => Sat May 26 18:08:58 +0000 2012
+  $created_at =~ /^\w{3}\s(\w{3})\s(\d{2})\s(\d{2})\:(\d{2})\:(\d{2})\s.{5}\s(\d{4})$/;
+# order of values for timelocal => seconds, minutes, hour, day, month, year
+  timelocal($5, $4, $3, $2, $months{$1}, $6);
 }
 
+__END__

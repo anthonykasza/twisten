@@ -1,31 +1,29 @@
 #!/usr/bin/perl
-############################################################
-### 		akasza         25 May 2012               ###
-###                                                      ###
-### This script will parse twisten configuration files   ###
-### and wait for user input. This script is meant to     ###
-### help debug how twisten will react when observing     ###
-### specific tweets.                                     ###
-############################################################
+#
+#  name:        twisten configuration parser
+#  author:      anthony kasza
+#  description: this script will parse a twisten configuration file and
+#               give feedback for debugging purposes
+#  version:     2.0
+#
 use warnings;
 use strict;
+use constant CONF_LOCATION => qw( ./twisten.conf );
 
-open (CONF, "twisten.conf") or die $!;
-my @fullConfFile=<CONF>;
-close (CONF);
+open (CONF_HANDLE, CONF_LOCATION) or die $!;
 my %config=();
 
-foreach (@fullConfFile){
-	unless ($_=~/^\#/){
-		if ($_=~/(.+)\:\:\:(.+)/){
-			%config=(%config, $1=>$2);
-		}
-	}
+while (<CONF_HANDLE>) {
+  next if (/^\#.*/);
+  if (/(.+)\:{3}(.+)/) {
+    %config=(%config, $1=>$2);
+  }
 }
+close (CONF_HANDLE);
 
 my $input = <>;
 chomp ($input);
-if (exists $config{$input}){
+if ($config{$input}) {
 	print $config{$input} . "\n";
 }
 else{
