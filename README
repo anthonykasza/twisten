@@ -1,2 +1,8 @@
-This set of Perl scripts are used for listening to a Twitter account
-for predefined strings and running corresponding system commands.
+About
+=====
+twisten will periodically poll a public tweeter account and execute systems based on tweets.
+I wrote the script in Perl and Ruby.
+
+The twisten.conf configuration file defines commands to run for each tweet string.
+The confParser.pl script will check the syntax of the configuration file.
+
