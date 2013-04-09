@@ -1,4 +1,13 @@
 #!/usr/bin/ruby
+#
+#  name:        twisten
+#  author:      anthony kasza
+#  description: this script will periodically pull a twitter account's 
+#               timeline and run system commands based on tweets.
+#               keywords and commands are defined in a configuration file.   
+#  version:     2.0
+#
+
 
 require 'rubygems'
 require 'yajl'
@@ -29,7 +38,7 @@ def main
 			puts "new tweet found => #{tweets[latest_tweet_epoch]}";
 			if ( config.has_key?(tweets[latest_tweet_epoch]) )
 				puts "executing => #{config[ tweets[latest_tweet_epoch] ]}";
-				system(config[ tweets[latest_tweet_epoch]);
+#				system(config[ tweets[latest_tweet_epoch]);
 			end
 			initial_latest_tweet_epoch = latest_tweet_epoch;
 		elsif (initial_latest_tweet_epoch > latest_tweet_epoch)
